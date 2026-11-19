@@ -485,7 +485,13 @@ document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeSheet(); if(
 function banner(msg){ const b=$('#banner'); b.textContent = msg||''; b.classList.toggle('show', !!msg); }
 
 /* ---------- Qui note ? ---------- */
-function myName(){ try { return localStorage.getItem('dimieat-nom') || ''; } catch(e){ return ''; } }
+let accountName = '';   // prénom enregistré dans le compte Supabase (suit l'utilisateur sur tous ses appareils)
+function myName(){ let l=''; try { l = localStorage.getItem('dimieat-nom') || ''; } catch(e){} return l || accountName; }
+async function saveName(v){
+  try{ localStorage.setItem('dimieat-nom', v); }catch(e){}
+  accountName = v;
+  if (sb) { const { error } = await sb.auth.updateUser({ data: { prenom: v } }); if (error) console.warn(error); }
+}
 function askName(){
   $('#sheet').innerHTML = `<div class="grab"></div>
     <div class="sh-head"><span class="e">👋</span><div><h2>Qui utilise ce téléphone ?</h2><p>Pour savoir qui a noté chaque dégustation</p></div></div>
@@ -494,7 +500,7 @@ function askName(){
   showSheet(); setTimeout(()=>$('#nName')?.focus(),250);
 }
 document.addEventListener('click', ev=>{
-  if (ev.target.closest('#nSave')){ const v=$('#nName').value.trim(); if(!v) return; try{ localStorage.setItem('dimieat-nom', v); }catch(e){} closeSheet(); toast('Bonjour '+v+' !'); }
+  if (ev.target.closest('#nSave')){ const v=$('#nName').value.trim(); if(!v) return; saveName(v); closeSheet(); toast('Bonjour '+v+' !'); }
   if (ev.target.closest('#who')){ askName(); }
   if (ev.target.closest('#logout')){ sb.auth.signOut().then(()=>location.reload()); }
 });
@@ -545,7 +551,9 @@ async function start(){
   // Le téléphone coupe souvent la connexion en veille : on recharge au réveil.
   document.addEventListener('visibilitychange', ()=>{ if (document.visibilityState==='visible') { loadAliments(); loadEssais(); } });
   window.addEventListener('online', ()=>{ loadAliments(); loadEssais(); });
+  try { const { data } = await sb.auth.getUser(); accountName = (data && data.user && data.user.user_metadata && data.user.user_metadata.prenom) || ''; } catch(e){}
   if (!myName()) askName();
+  else if (!accountName) saveName(myName());   // reprend le prénom déjà saisi sur cet appareil
 }
 
 render();
