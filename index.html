@@ -168,6 +168,12 @@
   .hitem .t .who{color:var(--muted);font-size:12px;font-weight:700}
   .del{border:0;background:transparent;color:var(--muted);font-weight:800;font-size:13px;padding:4px 6px;border-radius:8px}
   .del.arm{background:#fde3d6;color:var(--warn)}
+  .hact{display:flex;flex-direction:column;gap:2px;align-items:flex-end}
+  .del.edit{color:var(--accent)}
+  .editbar{background:#e8f4ec;border-radius:12px;padding:8px 10px;font-size:14px;font-weight:700;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .editbar[hidden]{display:none}
+  .editbar button{margin-left:auto}
+  .hitem.editing{background:#e8f4ec;border-radius:12px}
   .danger{margin-top:18px;border:1.5px solid #f1c3a8;background:transparent;color:var(--warn);font-weight:800;border-radius:12px;padding:10px 12px;width:100%}
   .danger.arm{background:#fde3d6}
     .src{color:var(--muted);font-size:12px;margin:26px 0 0;line-height:1.4}
@@ -483,10 +489,10 @@ function renderJournal(map, validIds){
 }
 
 /* ---------- Fiche aliment ---------- */
-let sheetFood = null, pickR = null, pickT = null;
+let sheetFood = null, pickR = null, pickT = null, editId = null;
 function openFood(id){
   const f = foodById(id); if(!f) return;
-  sheetFood = id; pickR = null; pickT = null;
+  sheetFood = id; pickR = null; pickT = null; editId = null;
   const c = CAT[f.cat] || CAT.autres;
   const list = essaisOf(id);
   const hist = list.map(e=>{
@@ -495,14 +501,16 @@ function openFood(id){
     return `<div class="hitem"><span class="r">${r?r.em:'🍽️'}</span>
       <div class="t"><b>${esc(fmtShort(e.date))}</b>${ageAt(e.date)?` <span class="who">(${esc(ageAt(e.date))})</span>`:''}${r?` — ${esc(r.tx)}`:''}${TX[e.texture]?`<span class="pill-tx">${TX[e.texture].em} ${esc(TX[e.texture].tx)}</span>`:''}${e.alerte?' <span style="color:var(--warn);font-weight:800">⚠️ à surveiller</span>':''}
       ${e.note?`<div>${esc(e.note)}</div>`:''}${who?`<div class="who">noté par ${esc(who)}</div>`:''}</div>
-      <button class="del needwrite" data-del="${esc(e._id)}">Suppr.</button></div>`;
+      <div class="hact"><button class="del edit" data-edit="${esc(e._id)}">Modifier</button><button class="del needwrite" data-del="${esc(e._id)}">Suppr.</button></div></div>`;
   }).join('');
   $('#sheet').innerHTML = `<div class="grab"></div>
     <div class="sh-head"><span class="e">${esc(emojiOf(f))}</span><div><h2>${esc(f.nom)}</h2>
       <p>${c.emoji} ${esc(c.nom)}${f.alg?` · <span style="color:var(--warn)">allergène : ${esc(f.alg)}</span>`:''}${list.length?` · goûté ${list.length} fois`:' · pas encore goûté'}</p></div>
       <button class="x" data-close>✕</button></div>
     <div class="needwrite">
-      <span class="lbl">Nouvelle dégustation</span>
+      <div id="formTop"></div>
+      <span class="lbl" id="fTitle">Nouvelle dégustation</span>
+      <div id="editBar" class="editbar" hidden>✏️ Modification de la dégustation du <b id="editDate"></b> <button class="del" id="editCancel">Annuler</button></div>
       <div class="rx" id="rx">${REACTIONS.map(r=>`<button data-r="${r.id}"><span class="em">${r.em}</span><span class="tx">${r.tx}</span></button>`).join('')}</div>
       <span class="lbl">Texture</span>
       <div class="rx tx5" id="txr">${TEXTURES.map(t=>`<button data-t="${t.id}"><span class="em">${t.em}</span><span class="tx">${t.tx}</span></button>`).join('')}</div>
@@ -531,7 +539,7 @@ function openAdd(){
   setTimeout(()=>$('#aNom')?.focus(), 250);
 }
 function refreshSheet(){
-  if (!sheetFood || !$('#sheet').classList.contains('show')) return;
+  if (!sheetFood || !$('#sheet').classList.contains('show') || editId) return;
   const keepN = $('#fNote')?.value, keepA = $('#fAlert')?.checked, keepD = $('#fDate')?.value, keepR = pickR, keepT = pickT;
   openFood(sheetFood);
   if ($('#fNote')) { $('#fNote').value = keepN||''; $('#fAlert').checked = !!keepA; if (keepD) $('#fDate').value = keepD; }
@@ -551,16 +559,30 @@ async function saveEssai(){
   if(!sb){ toast('Non connecté'); return; }
   const btn = $('#fSave'); btn.disabled = true;
   const id = sheetFood;
-  const row = { aliment: id, date: $('#fDate').value || today(), reaction: pickR || '', texture: pickT || '', note: $('#fNote').value.trim(), alerte: $('#fAlert').checked, par: myName() };
-  let { error } = await sb.from('essais').insert(row);
+  const row = { aliment: id, date: $('#fDate').value || today(), reaction: pickR || '', texture: pickT || '', note: $('#fNote').value.trim(), alerte: $('#fAlert').checked };
+  if (!editId) row.par = myName();        // en modification, on garde l'auteur d'origine
+  const write = r => editId ? sb.from('essais').update(r).eq('id', editId) : sb.from('essais').insert(r);
+  let { error } = await write(row);
   if (error && /texture/.test(error.message||'')) {   // colonne pas encore créée dans Supabase
-    delete row.texture; ({ error } = await sb.from('essais').insert(row));
-    if (!error) console.warn('Colonne texture absente : exécuter la migration SQL');
+    toast('Texture non enregistrée : colonne manquante dans Supabase');
+    delete row.texture; ({ error } = await write(row));
   }
   if (error){ writeFail(error); btn.disabled=false; return; }
-  toast('Enregistré ✔'); await loadEssais(); openFood(id);
+  toast(editId ? 'Modifié ✔' : 'Enregistré ✔'); editId = null; await loadEssais(); openFood(id);
+}
+function startEdit(eid){
+  const e = essais.find(x=>x._id===eid); if (!e) return;
+  editId = eid; pickR = e.reaction || null; pickT = e.texture || null;
+  $('#fDate').value = e.date || today(); $('#fNote').value = e.note || ''; $('#fAlert').checked = !!e.alerte;
+  $('#fTitle').textContent = 'Modifier la dégustation';
+  $('#editDate').textContent = fmtShort(e.date); $('#editBar').hidden = false;
+  $('#fSave').textContent = 'Enregistrer les modifications';
+  document.querySelectorAll('.hitem').forEach(h=>h.classList.toggle('editing', h.querySelector('[data-edit]')?.dataset.edit===eid));
+  markPicks();
+  $('#formTop').scrollIntoView({behavior:'smooth', block:'start'});
 }
 async function delEssai(id){
+  if (id===editId) editId = null;
   const { error } = await sb.from('essais').delete().eq('id', id);
   if (error) return writeFail(error);
   await loadEssais(); if(sheetFood) openFood(sheetFood);
@@ -596,6 +618,8 @@ document.addEventListener('click', ev=>{
   const r = t.closest('#rx button'); if (r){ pickR = pickR===r.dataset.r ? null : r.dataset.r; markPicks(); return; }
   const jb = t.closest('.jseg button'); if (jb){ jMode = jb.dataset.j; render(); return; }
   const tb = t.closest('#txr button'); if (tb){ pickT = pickT===tb.dataset.t ? null : tb.dataset.t; markPicks(); return; }
+  const ed = t.closest('[data-edit]'); if (ed){ startEdit(ed.dataset.edit); return; }
+  if (t.closest('#editCancel')){ openFood(sheetFood); return; }
   if (t.closest('#fSave')){ saveEssai(); return; }
   if (t.closest('#aSave')){ addFood(); return; }
   const d = t.closest('[data-del]');
