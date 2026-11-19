@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DimiEat — Ce qu'il a goûté</title>
+<meta name="theme-color" content="#f7f3ea">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f7f3ea; --card:#fffdf8; --ink:#2a2823; --muted:#857f72; --line:#e6dfd0;
+    --accent:#2f8a5a; --accent-ink:#fff; --warn:#c2551f; --radius:18px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Nunito,system-ui,sans-serif}
+  body{padding-bottom:110px}
+  button{font-family:inherit;cursor:pointer}
+  .wrap{max-width:900px;margin:0 auto;padding:0 14px}
+
+  header.top{padding:18px 0 6px}
+  .title{display:flex;align-items:center;gap:10px;margin:0;font-size:24px;font-weight:900;letter-spacing:-.3px}
+  .title span.spoon{font-size:28px}
+  .global{margin-top:12px;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px}
+  .global .big{font-size:30px;font-weight:900;line-height:1}
+  .global .big small{font-size:15px;font-weight:700;color:var(--muted)}
+  .bar{height:10px;border-radius:99px;background:#ece5d6;overflow:hidden;margin-top:10px}
+  .bar > i{display:block;height:100%;border-radius:99px;background:var(--accent);transition:width .4s}
+  .reacts{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+  .reacts span{background:#f1ebdf;border-radius:99px;padding:3px 10px;font-weight:800;font-size:14px}
+
+  .banner{margin-top:10px;padding:10px 14px;border-radius:12px;font-size:14px;font-weight:600;background:#fff2dc;color:#7a4b06;display:none}
+  .banner.show{display:block}
+
+  nav.tabs{display:flex;gap:6px;margin:14px 0 0;background:#ebe4d5;border-radius:14px;padding:4px}
+  nav.tabs button{flex:1;border:0;background:transparent;padding:9px 0;border-radius:11px;font-weight:800;font-size:15px;color:var(--muted)}
+  nav.tabs button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+
+  .sticky{position:sticky;top:0;z-index:5;background:var(--bg);padding:10px 0 8px}
+  .chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{flex:0 0 auto;border:1.5px solid var(--line);background:var(--card);border-radius:14px;padding:7px 11px 8px;text-align:left;min-width:92px}
+  .chip .n{font-weight:800;font-size:14px;white-space:nowrap}
+  .chip .p{font-size:12px;color:var(--muted);font-weight:700}
+  .chip .mini{height:4px;border-radius:9px;background:#ece5d6;margin-top:5px;overflow:hidden}
+  .chip .mini i{display:block;height:100%;background:var(--c)}
+  .chip.on{border-color:var(--c);background:color-mix(in srgb,var(--c) 12%,var(--card))}
+  .tools{display:flex;gap:8px;margin-top:8px}
+  .tools input{flex:1;min-width:0;border:1.5px solid var(--line);background:var(--card);border-radius:12px;padding:9px 12px;font:inherit;font-size:15px}
+  .seg{display:flex;background:#ebe4d5;border-radius:12px;padding:3px}
+  .seg button{border:0;background:transparent;border-radius:9px;padding:6px 9px;font-weight:800;font-size:13px;color:var(--muted)}
+  .seg button.on{background:var(--card);color:var(--ink)}
+
+  section.cat{margin-top:18px}
+  .cathead{display:flex;align-items:center;gap:10px}
+  .cathead .ce{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;font-size:22px;background:color-mix(in srgb,var(--c) 18%,#fff)}
+  .cathead h2{margin:0;font-size:18px;font-weight:900;flex:1}
+  .cathead .cnt{font-weight:800;color:var(--muted);font-size:14px}
+  .cathead button.info{border:0;background:#ebe4d5;width:30px;height:30px;border-radius:50%;font-weight:900;color:var(--muted)}
+  .catbar{height:6px;border-radius:9px;background:#ece5d6;margin:8px 0 0;overflow:hidden}
+  .catbar i{display:block;height:100%;background:var(--c);transition:width .4s}
+  .conseil{display:none;margin-top:8px;background:color-mix(in srgb,var(--c) 9%,var(--card));border-left:4px solid var(--c);border-radius:10px;padding:10px 12px;font-size:14px;line-height:1.45}
+  .conseil.show{display:block}
+  .conseil ul{margin:0;padding-left:18px}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(98px,1fr));gap:9px;margin-top:10px}
+  .tile{position:relative;border:1.5px dashed #d8d0bf;background:transparent;border-radius:16px;padding:12px 6px 10px;text-align:center;min-height:96px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:4px}
+  .tile .e{font-size:32px;line-height:1.1;filter:grayscale(1);opacity:.5}
+  .tile .nm{font-size:13px;font-weight:700;line-height:1.15;color:var(--muted)}
+  .tile.done{border:1.5px solid color-mix(in srgb,var(--c) 45%,#fff);background:color-mix(in srgb,var(--c) 14%,var(--card))}
+  .tile.done .e{filter:none;opacity:1}
+  .tile.done .nm{color:var(--ink)}
+  .tile .badge{position:absolute;top:5px;right:6px;font-size:18px}
+  .tile .times{position:absolute;top:7px;left:8px;font-size:11px;font-weight:900;color:var(--muted)}
+  .tile .alg{font-size:10px;font-weight:800;color:var(--warn);text-transform:uppercase;letter-spacing:.3px}
+  .tile .warn{position:absolute;bottom:5px;right:6px;font-size:13px}
+  .empty{color:var(--muted);font-weight:600;padding:16px 4px}
+
+  .fab{position:fixed;right:18px;bottom:22px;z-index:10;border:0;background:var(--accent);color:var(--accent-ink);border-radius:99px;padding:15px 20px;font-weight:900;font-size:16px;box-shadow:0 6px 18px rgba(47,138,90,.35)}
+
+  /* Journal */
+  .jday{margin-top:16px}
+  .jday h3{margin:0 0 6px;font-size:14px;color:var(--muted);font-weight:800;}
+  .jrow{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:9px 12px;margin-bottom:6px;width:100%;text-align:left}
+  .jrow .e{font-size:24px}
+  .jrow .t{flex:1;min-width:0}
+  .jrow .t b{display:block;font-size:15px}
+  .jrow .t small{color:var(--muted);font-size:13px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .jrow .r{font-size:24px}
+  .alertbox{margin-top:14px;background:#fdebe1;border:1px solid #f1c3a8;border-radius:var(--radius);padding:12px 14px}
+  .alertbox h3{margin:0 0 6px;font-size:15px;color:var(--warn)}
+
+  /* Sheets */
+  .veil{position:fixed;inset:0;background:rgba(30,28,22,.38);z-index:20;opacity:0;pointer-events:none;transition:opacity .2s}
+  .veil.show{opacity:1;pointer-events:auto}
+  .sheet{position:fixed;left:0;right:0;bottom:0;z-index:21;background:var(--card);border-radius:22px 22px 0 0;max-height:90vh;overflow-y:auto;transform:translateY(105%);transition:transform .25s ease;padding:8px 18px 28px;max-width:640px;margin:0 auto}
+  .sheet.show{transform:none}
+  .grab{width:44px;height:5px;border-radius:9px;background:#ddd5c4;margin:4px auto 12px}
+  .sh-head{display:flex;align-items:center;gap:12px}
+  .sh-head .e{font-size:44px}
+  .sh-head h2{margin:0;font-size:22px;font-weight:900}
+  .sh-head p{margin:2px 0 0;color:var(--muted);font-weight:700;font-size:14px}
+  .x{margin-left:auto;border:0;background:#ebe4d5;width:34px;height:34px;border-radius:50%;font-size:16px;font-weight:900;color:var(--muted);flex:0 0 auto}
+  .lbl{display:block;font-weight:800;font-size:14px;margin:16px 0 6px}
+  .rx{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+  .rx button{border:2px solid var(--line);background:#fff;border-radius:14px;padding:8px 0 6px;display:flex;flex-direction:column;align-items:center;gap:2px}
+  .rx button .em{font-size:30px;line-height:1}
+  .rx button .tx{font-size:11px;font-weight:800;color:var(--muted)}
+  .rx button.on{border-color:var(--accent);background:#e8f4ec}
+  .row2{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  input[type=date],input[type=text],select,textarea{border:1.5px solid var(--line);background:#fff;border-radius:12px;padding:10px 12px;font:inherit;font-size:15px;width:100%}
+  textarea{min-height:64px;resize:vertical}
+  .check{display:flex;align-items:center;gap:8px;margin-top:10px;font-weight:700;font-size:14px;color:var(--warn)}
+  .check input{width:20px;height:20px}
+  .primary{width:100%;margin-top:16px;border:0;background:var(--accent);color:#fff;font-weight:900;font-size:16px;padding:14px;border-radius:14px}
+  .primary:disabled{opacity:.5}
+  .hist{margin-top:20px;border-top:1px solid var(--line);padding-top:6px}
+  .hitem{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid #f0eadd}
+  .hitem .r{font-size:26px;line-height:1}
+  .hitem .t{flex:1;font-size:14px}
+  .hitem .t b{font-size:15px}
+  .hitem .t .who{color:var(--muted);font-size:12px;font-weight:700}
+  .del{border:0;background:transparent;color:var(--muted);font-weight:800;font-size:13px;padding:4px 6px;border-radius:8px}
+  .del.arm{background:#fde3d6;color:var(--warn)}
+  .danger{margin-top:18px;border:1.5px solid #f1c3a8;background:transparent;color:var(--warn);font-weight:800;border-radius:12px;padding:10px 12px;width:100%}
+  .danger.arm{background:#fde3d6}
+    .src{color:var(--muted);font-size:12px;margin:26px 0 0;line-height:1.4}
+  .toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:10px 16px;border-radius:12px;font-weight:700;font-size:14px;opacity:0;transition:.25s;z-index:30;pointer-events:none}
+  .toast.show{opacity:1;transform:translateX(-50%)}
+</style>
+</head>
+<body>
+<div class="wrap" id="login" hidden>
+  <form id="lForm" class="global" style="margin-top:40px">
+    <h1 class="title" style="margin-bottom:6px"><span class="spoon">🥄</span> DimiEat</h1>
+    <p style="color:var(--muted);font-weight:700;margin:0 0 8px">Connectez-vous une fois sur ce téléphone.</p>
+    <span class="lbl">E-mail</span><input type="text" id="lMail" autocomplete="username" inputmode="email" required>
+    <span class="lbl">Mot de passe</span><input type="password" id="lPass" autocomplete="current-password" required>
+    <button class="primary" id="lBtn">Se connecter</button>
+    <p id="lErr" style="color:var(--warn);font-weight:700;min-height:1em"></p>
+  </form>
+</div>
+<div class="wrap" id="app">
+  <header class="top">
+    <div style="display:flex;align-items:center;gap:8px"><h1 class="title" style="flex:1"><span class="spoon">🥄</span> Ce qu'il a goûté</h1>
+      <button id="who" class="x" title="Changer de prénom" style="margin:0">👤</button><button id="logout" class="x" title="Se déconnecter" style="margin:0">🚪</button></div>
+    <div class="global">
+      <div class="big" id="gNum">0 <small>/ 0 aliments découverts</small></div>
+      <div class="bar"><i id="gBar" style="width:0"></i></div>
+      <div class="reacts" id="gReacts"></div>
+    </div>
+    <div class="banner" id="banner"></div>
+    <nav class="tabs">
+      <button class="on" data-view="aliments">🍽️ Aliments</button>
+      <button data-view="journal">📖 Journal</button>
+    </nav>
+  </header>
+
+  <div id="vAliments">
+    <div class="sticky">
+      <div class="chips" id="chips"></div>
+      <div class="tools">
+        <input id="q" type="search" placeholder="Chercher un aliment…" autocomplete="off">
+        <div class="seg" id="seg">
+          <button class="on" data-f="all">Tous</button>
+          <button data-f="done">Goûtés</button>
+          <button data-f="todo">À faire</button>
+        </div>
+      </div>
+    </div>
+    <div id="cats"></div>
+  </div>
+
+  <div id="vJournal" hidden>
+    <div id="journal"></div>
+  </div>
+
+  <p class="src">Catégories et conseils repris de l'affiche Santé publique France « La diversification alimentaire de votre enfant jusqu'à 3 ans » (colonne 4–6 mois). Si allergies dans la famille, demander l'avis du médecin avant de commencer.</p>
+</div>
+
+<button class="fab needwrite" id="fab">＋ Aliment</button>
+
+<div class="veil" id="veil"></div>
+<div class="sheet" id="sheet"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ---------- Référentiel ---------- */
+const REACTIONS = [
+  {id:'adore', em:'😂', tx:'Adore'},
+  {id:'aime',  em:'😋', tx:'Aimé'},
+  {id:'bof',   em:'😐', tx:'Bof'},
+  {id:'pas',   em:'😖', tx:'Pas aimé'},
+  {id:'vomi',  em:'🤮', tx:'Recraché'},
+];
+const RX = Object.fromEntries(REACTIONS.map(r=>[r.id,r]));
+
+const CATS = [
+ {id:'legumes', nom:'Légumes', emoji:'🥕', c:'#e07a2f', conseil:[
+   'Tous les jours, quelques cuillères à café puis plus selon l’appétit',
+   'Bien cuits et mixés lisses','De saison, local, bio si possible']},
+ {id:'fruits', nom:'Fruits', emoji:'🍎', c:'#d4473a', conseil:[
+   'Bien cuits et mixés en compote, sans sucre ajouté','De saison, local, bio si possible']},
+ {id:'laitiers', nom:'Produits laitiers', emoji:'🧀', c:'#d9a62a', conseil:[
+   'Nature, non aromatisés, à alterner','Ex. : quelques cuillères à café de yaourt au goûter, un peu de fromage râpé fondu dans une purée',
+   'Pas de lait cru ni de fromage au lait cru (sauf emmental et comté)','Pas de produits 0 %, écrémés ou demi-écrémés avant 3 ans']},
+ {id:'secs', nom:'Légumes secs', emoji:'🫘', c:'#9a6b3f', conseil:[
+   'De temps en temps, 1 cuillère à café','Bien cuits et mixés en purée lisse','Selon la façon dont il les digère']},
+ {id:'feculents', nom:'Féculents', emoji:'🍝', c:'#b8913f', conseil:[
+   'Toujours mélangés aux légumes : ¼ féculents, ¾ légumes, en purée lisse',
+   'Le gluten peut être introduit, même en cas de risque d’allergie','Complets selon la digestion']},
+ {id:'viandes', nom:'Viandes', emoji:'🍗', c:'#b4553e', conseil:[
+   'Toujours très cuites, privilégier la volaille','5 g/jour = 1 cuillère à café mixée',
+   'Jambon blanc possible de temps en temps, mixé très lisse ; pas d’autre charcuterie']},
+ {id:'poissons', nom:'Poissons', emoji:'🐟', c:'#2f8a8a', conseil:[
+   'Toujours très cuits','2 fois par semaine, dont 1 poisson gras (sardine, maquereau, saumon…)',
+   'Pas de coquillages crus']},
+ {id:'oeufs', nom:'Œufs', emoji:'🥚', c:'#c9a800', conseil:[
+   'Œuf dur écrasé : 1 cuillère à café','Jamais de préparation à base d’œuf cru']},
+ {id:'gras', nom:'Matières grasses', emoji:'🫒', c:'#6f8a2f', conseil:[
+   'Par jour : 1 cuillère à café d’huile, ou de temps en temps une noisette de beurre',
+   'À ajouter crues aux préparations','Varier les huiles (colza, noix, olive…)']},
+ {id:'oleagineux', nom:'Oléagineux & graines', emoji:'🥜', c:'#8a5a3c', conseil:[
+   'Uniquement en poudre ou en purée lisse, jamais entiers (risque d’étouffement)',
+   'Allergènes fréquents : demander l’avis du médecin si allergies dans la famille']},
+ {id:'herbes', nom:'Herbes & épices', emoji:'🌿', c:'#3f8f4a', conseil:[
+   'Une pointe pour faire découvrir de nouvelles saveurs','Ne pas saler les préparations']},
+ {id:'autres', nom:'Autres', emoji:'✨', c:'#7a6fa8', conseil:[
+   'Seule boisson recommandée : l’eau','Pas de miel avant 1 an (risque infectieux)',
+   'Produits sucrés : à limiter et à introduire le plus tard possible']},
+];
+const CAT = Object.fromEntries(CATS.map(c=>[c.id,c]));
+
+// "Nom|emoji|allergène"
+const BASE = {
+ legumes:`Carotte|🥕,Courgette|🥒,Haricot vert|🫛,Petits pois|🫛,Potiron|🎃,Butternut|🎃,Potimarron|🎃,Patate douce|🍠,Brocoli|🥦,Chou-fleur|🥦,Chou romanesco|🥦,Épinard|🥬,Blette|🥬,Poireau|🥬,Panais|🥕,Navet|,Betterave|,Fenouil|,Céleri-rave|,Céleri branche|🥬,Artichaut|,Asperge|,Aubergine|🍆,Poivron|🫑,Tomate|🍅,Concombre|🥒,Avocat|🥑,Endive|🥬,Salade|🥬,Mâche|🥬,Chou vert|🥬,Chou kale|🥬,Chou de Bruxelles|🥬,Champignon|🍄,Maïs|🌽,Oignon|🧅,Échalote|🧅,Ail|🧄,Topinambour|,Radis|,Courge spaghetti|🎃,Cresson|🥬`,
+ fruits:`Pomme|🍎,Poire|🍐,Banane|🍌,Pêche|🍑,Nectarine|🍑,Abricot|🍑,Prune|,Mirabelle|,Cerise|🍒,Fraise|🍓,Framboise|,Myrtille|🫐,Mûre|🫐,Cassis|🫐,Groseille|,Melon|🍈,Pastèque|🍉,Kiwi|🥝,Mangue|🥭,Ananas|🍍,Orange|🍊,Clémentine|🍊,Citron|🍋,Pamplemousse|🍊,Raisin|🍇,Figue|,Coing|,Rhubarbe|,Litchi|,Papaye|,Fruit de la passion|,Grenade|,Kaki|,Datte|,Noix de coco|🥥`,
+ laitiers:`Yaourt nature|🥛|lait,Fromage blanc|🥛|lait,Petit-suisse|🥛|lait,Emmental|🧀|lait,Comté|🧀|lait,Mozzarella (pasteurisée)|🧀|lait,Chèvre (pasteurisé)|🧀|lait,Ricotta|🧀|lait,Parmesan|🧀|lait`,
+ secs:`Lentilles corail|🫘,Lentilles vertes|🫘,Pois chiches|🫘,Haricots blancs|🫘,Haricots rouges|🫘,Pois cassés|🫛,Fèves|🫛,Haricots azuki|🫘,Edamame|🫛|soja`,
+ feculents:`Pomme de terre|🥔,Riz|🍚,Riz complet|🍚,Pâtes|🍝|gluten,Pâtes complètes|🍝|gluten,Vermicelles|🍜|gluten,Semoule|🌾|gluten,Pain|🍞|gluten,Boulgour|🌾|gluten,Flocons d'avoine|🌾|gluten,Quinoa|🌾,Polenta|🌽,Sarrasin|🌾,Millet|🌾,Tapioca|`,
+ viandes:`Poulet|🍗,Dinde|🍗,Canard|🍗,Bœuf|🥩,Veau|🥩,Agneau|🥩,Porc|🥩,Lapin|🐇,Jambon blanc|🍖`,
+ poissons:`Cabillaud|🐟|poisson,Colin / lieu|🐟|poisson,Merlu|🐟|poisson,Sole|🐟|poisson,Dorade|🐟|poisson,Truite|🐟|poisson,Saumon|🐟|poisson,Sardine|🐟|poisson,Maquereau|🐟|poisson,Thon|🐟|poisson,Crevette (cuite)|🦐|crustacés`,
+ oeufs:`Jaune d'œuf|🥚|œuf,Blanc d'œuf|🥚|œuf,Œuf entier|🥚|œuf`,
+ gras:`Huile de colza|🫒,Huile d'olive|🫒,Huile de noix|🫒,Huile de tournesol|🌻,Beurre|🧈|lait,Crème fraîche|🥛|lait`,
+ oleagineux:`Purée de cacahuète|🥜|arachide,Poudre d'amande|🌰|fruits à coque,Purée de noisette|🌰|fruits à coque,Noix (poudre)|🌰|fruits à coque,Noix de cajou (purée)|🌰|fruits à coque,Sésame / tahini|🌰|sésame,Graines de chia|,Graines de lin|`,
+ herbes:`Persil|🌿,Basilic|🌿,Ciboulette|🌿,Coriandre|🌿,Menthe|🌿,Aneth|🌿,Thym|🌿,Romarin|🌿,Laurier|🍃,Herbes de Provence|🌿,Cumin|🫙,Curcuma|🫙,Cannelle|🫙,Vanille|🫙,Muscade|🫙,Paprika doux|🌶️,Gingembre|🫚`,
+ autres:`Eau|💧`,
+};
+const slug = s => s.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+const norm = s => (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+const BUILTIN = [];
+for (const [cat, list] of Object.entries(BASE)) {
+  for (const item of list.split(',')) {
+    const [nom, emoji, alg] = item.split('|');
+    BUILTIN.push({id:'b-'+cat+'-'+slug(nom), nom:nom.trim(), cat, emoji:(emoji||'').trim(), alg:(alg||'').trim(), builtin:true});
+  }
+}
+
+/* ---------- État ---------- */
+let custom = [];             // aliments ajoutés (db)
+let essais = [];             // dégustations (db)
+let view = 'aliments', catFilter = 'all', stateFilter = 'all', query = '';
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const today = () => new Date().toLocaleDateString('sv');
+const fmtDate = d => { try { return new Date(d+'T12:00:00').toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'}); } catch(e){ return d; } };
+const fmtShort = d => { try { return new Date(d+'T12:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'}); } catch(e){ return d; } };
+
+function allFoods(){ return BUILTIN.concat(custom); }
+function foodById(id){ return allFoods().find(f=>f.id===id); }
+const FALLBACK = {legumes:'🌱', fruits:'🍏', oleagineux:'🌰'};
+function emojiOf(f){ return f.emoji || FALLBACK[f.cat] || (CAT[f.cat]||CAT.autres).emoji; }
+function essaisOf(id){ return essais.filter(e=>e.aliment===id).sort((a,b)=> (b.date||'').localeCompare(a.date||'') || (b.ts||0)-(a.ts||0)); }
+function byFood(){ const m={}; for(const e of essais){ (m[e.aliment] ||= []).push(e); } for(const k in m){ m[k].sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.ts||0)-(a.ts||0)); } return m; }
+
+/* ---------- Rendu ---------- */
+function render(){
+  const foods = allFoods();
+  const map = byFood();
+  const validIds = new Set(foods.map(f=>f.id));
+  const doneCount = foods.filter(f=>map[f.id]).length;
+  $('#gNum').innerHTML = `${doneCount} <small>/ ${foods.length} aliments découverts</small>`;
+  $('#gBar').style.width = (foods.length? doneCount/foods.length*100:0)+'%';
+  const rc = {}; for (const f of foods){ const l = map[f.id]; if(l && l[0].reaction) rc[l[0].reaction]=(rc[l[0].reaction]||0)+1; }
+  $('#gReacts').innerHTML = REACTIONS.filter(r=>rc[r.id]).map(r=>`<span title="${r.tx}">${r.em} ${rc[r.id]}</span>`).join('') ;
+
+  // chips
+  const chip = (id, nom, emo, c, d, t) => `<button class="chip ${catFilter===id?'on':''}" data-cat="${id}" style="--c:${c}">
+     <div class="n">${emo} ${esc(nom)}</div><div class="p">${d}/${t}</div><div class="mini"><i style="width:${t?d/t*100:0}%"></i></div></button>`;
+  let ch = chip('all','Tout','🍽️','#2f8a5a',doneCount,foods.length);
+  for (const c of CATS){ const fs = foods.filter(f=>f.cat===c.id); if(!fs.length) continue; ch += chip(c.id,c.nom,c.emoji,c.c,fs.filter(f=>map[f.id]).length,fs.length); }
+  $('#chips').innerHTML = ch;
+
+  // sections
+  const q = norm(query);
+  let html = '';
+  for (const c of CATS){
+    if (catFilter!=='all' && catFilter!==c.id) continue;
+    const fsAll = foods.filter(f=>f.cat===c.id).sort((a,b)=>a.nom.localeCompare(b.nom,'fr'));
+    if(!fsAll.length) continue;
+    const d = fsAll.filter(f=>map[f.id]).length;
+    let fs = fsAll.filter(f=> !q || norm(f.nom).includes(q));
+    if (stateFilter==='done') fs = fs.filter(f=>map[f.id]);
+    if (stateFilter==='todo') fs = fs.filter(f=>!map[f.id]);
+    if ((q || stateFilter!=='all') && !fs.length) continue;
+    html += `<section class="cat" style="--c:${c.c}">
+      <div class="cathead"><div class="ce">${c.emoji}</div><h2>${esc(c.nom)}</h2><span class="cnt">${d}/${fsAll.length}</span>
+      <button class="info" data-info="${c.id}" aria-label="Conseils">i</button></div>
+      <div class="catbar"><i style="width:${d/fsAll.length*100}%"></i></div>
+      <div class="conseil" id="cs-${c.id}"><ul>${c.conseil.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>
+      <div class="grid">${fs.map(f=>tile(f,map[f.id])).join('') || '<div class="empty">Rien ici pour l’instant.</div>'}</div>
+    </section>`;
+  }
+  $('#cats').innerHTML = html || '<div class="empty">Aucun aliment ne correspond.</div>';
+
+  renderJournal(map, validIds);
+}
+function tile(f, list){
+  const last = list && list[0];
+  const r = last && RX[last.reaction];
+  const alert = list && list.some(e=>e.alerte);
+  return `<button class="tile ${list?'done':''}" data-food="${esc(f.id)}">
+    ${list && list.length>1?`<span class="times">×${list.length}</span>`:''}
+    ${r?`<span class="badge">${r.em}</span>`:''}
+    <span class="e">${esc(emojiOf(f))}</span>
+    <span class="nm">${esc(f.nom)}</span>
+    ${f.alg?`<span class="alg">${esc(f.alg)}</span>`:''}
+    ${alert?`<span class="warn" title="Réaction à surveiller">⚠️</span>`:''}
+  </button>`;
+}
+function renderJournal(map, validIds){
+  const list = essais.filter(e=>validIds.has(e.aliment)).sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.ts||0)-(a.ts||0));
+  if(!list.length){ $('#journal').innerHTML = '<div class="empty" style="margin-top:16px">Aucune dégustation enregistrée. Touchez un aliment pour noter la première !</div>'; return; }
+  let html = '';
+  const alerts = list.filter(e=>e.alerte);
+  if (alerts.length){
+    html += `<div class="alertbox"><h3>⚠️ À surveiller</h3>${alerts.map(row).join('')}</div>`;
+  }
+  let cur = null;
+  for (const e of list){
+    if (e.date!==cur){ if(cur!==null) html+='</div>'; cur=e.date; html+=`<div class="jday"><h3>${esc((s=>s.charAt(0).toUpperCase()+s.slice(1))(fmtDate(e.date)))}</h3>`; }
+    html += row(e);
+  }
+  html += '</div>';
+  $('#journal').innerHTML = html;
+  function row(e){
+    const f = foodById(e.aliment); const r = RX[e.reaction];
+    const sub = [CAT[f.cat]?.nom, e.note].filter(Boolean).join(' · ');
+    return `<button class="jrow" data-food="${esc(f.id)}"><span class="e">${esc(emojiOf(f))}</span>
+      <span class="t"><b>${esc(f.nom)}${e.alerte?' ⚠️':''}</b><small>${esc(sub)}</small></span><span class="r">${r?r.em:''}</span></button>`;
+  }
+}
+
+/* ---------- Fiche aliment ---------- */
+let sheetFood = null, pickR = null;
+function openFood(id){
+  const f = foodById(id); if(!f) return;
+  sheetFood = id; pickR = null;
+  const c = CAT[f.cat] || CAT.autres;
+  const list = essaisOf(id);
+  const hist = list.map(e=>{
+    const r = RX[e.reaction];
+    const who = e.par || '';
+    return `<div class="hitem"><span class="r">${r?r.em:'🍽️'}</span>
+      <div class="t"><b>${esc(fmtShort(e.date))}</b>${r?` — ${esc(r.tx)}`:''}${e.alerte?' <span style="color:var(--warn);font-weight:800">⚠️ à surveiller</span>':''}
+      ${e.note?`<div>${esc(e.note)}</div>`:''}${who?`<div class="who">noté par ${esc(who)}</div>`:''}</div>
+      <button class="del needwrite" data-del="${esc(e._id)}">Suppr.</button></div>`;
+  }).join('');
+  $('#sheet').innerHTML = `<div class="grab"></div>
+    <div class="sh-head"><span class="e">${esc(emojiOf(f))}</span><div><h2>${esc(f.nom)}</h2>
+      <p>${c.emoji} ${esc(c.nom)}${f.alg?` · <span style="color:var(--warn)">allergène : ${esc(f.alg)}</span>`:''}${list.length?` · goûté ${list.length} fois`:' · pas encore goûté'}</p></div>
+      <button class="x" data-close>✕</button></div>
+    <div class="needwrite">
+      <span class="lbl">Nouvelle dégustation</span>
+      <div class="rx" id="rx">${REACTIONS.map(r=>`<button data-r="${r.id}"><span class="em">${r.em}</span><span class="tx">${r.tx}</span></button>`).join('')}</div>
+      <span class="lbl">Date</span>
+      <input type="date" id="fDate" value="${today()}" max="${today()}">
+      <span class="lbl">Note (facultatif)</span>
+      <textarea id="fNote" placeholder="Texture, quantité, avec quoi…" maxlength="300"></textarea>
+      <label class="check"><input type="checkbox" id="fAlert"> Réaction à surveiller (rougeur, boutons…)</label>
+      <button class="primary" id="fSave">Enregistrer</button>
+    </div>
+    ${list.length?`<div class="hist"><span class="lbl">Historique</span>${hist}</div>`:''}
+    ${!f.builtin?`<button class="danger needwrite" id="fDelFood">Supprimer cet aliment ajouté</button>`:''}`;
+  showSheet();
+}
+function openAdd(){
+  sheetFood = null;
+  $('#sheet').innerHTML = `<div class="grab"></div>
+    <div class="sh-head"><span class="e">➕</span><div><h2>Ajouter un aliment</h2><p>Il apparaîtra sur vos deux téléphones</p></div><button class="x" data-close>✕</button></div>
+    <span class="lbl">Nom</span><input type="text" id="aNom" maxlength="40" placeholder="ex. Chou rouge">
+    <span class="lbl">Catégorie</span>
+    <select id="aCat">${CATS.map(c=>`<option value="${c.id}">${c.emoji} ${esc(c.nom)}</option>`).join('')}</select>
+    <span class="lbl">Emoji (facultatif)</span><input type="text" id="aEmo" maxlength="4" placeholder="🥬">
+    <span class="lbl">Allergène (facultatif)</span><input type="text" id="aAlg" maxlength="20" placeholder="ex. lait, gluten…">
+    <button class="primary" id="aSave">Ajouter</button>`;
+  showSheet();
+  setTimeout(()=>$('#aNom')?.focus(), 250);
+}
+function refreshSheet(){
+  if (!sheetFood || !$('#sheet').classList.contains('show')) return;
+  const keepN = $('#fNote')?.value, keepA = $('#fAlert')?.checked, keepD = $('#fDate')?.value, keepR = pickR;
+  openFood(sheetFood);
+  if ($('#fNote')) { $('#fNote').value = keepN||''; $('#fAlert').checked = !!keepA; if (keepD) $('#fDate').value = keepD; }
+  pickR = keepR; document.querySelectorAll('#rx button').forEach(b=>b.classList.toggle('on', b.dataset.r===pickR));
+}
+function showSheet(){ $('#veil').classList.add('show'); $('#sheet').classList.add('show'); }
+function closeSheet(){ $('#veil').classList.remove('show'); $('#sheet').classList.remove('show'); sheetFood=null; }
+
+/* ---------- Écritures (Supabase) ---------- */
+function toast(t){ const el=$('#toast'); el.textContent=t; el.classList.add('show'); clearTimeout(toast._t); toast._t=setTimeout(()=>el.classList.remove('show'),2200); }
+function writeFail(e){ console.error(e); toast(navigator.onLine===false ? 'Pas de réseau : réessayez plus tard' : 'Échec de l’enregistrement, réessayez'); }
+async function saveEssai(){
+  if(!sb){ toast('Non connecté'); return; }
+  const btn = $('#fSave'); btn.disabled = true;
+  const id = sheetFood;
+  const row = { aliment: id, date: $('#fDate').value || today(), reaction: pickR || '', note: $('#fNote').value.trim(), alerte: $('#fAlert').checked, par: myName() };
+  const { error } = await sb.from('essais').insert(row);
+  if (error){ writeFail(error); btn.disabled=false; return; }
+  toast('Enregistré ✔'); await loadEssais(); openFood(id);
+}
+async function delEssai(id){
+  const { error } = await sb.from('essais').delete().eq('id', id);
+  if (error) return writeFail(error);
+  await loadEssais(); if(sheetFood) openFood(sheetFood);
+}
+async function addFood(){
+  const nom = $('#aNom').value.trim(); if(!nom){ $('#aNom').focus(); return; }
+  if (allFoods().some(f=>norm(f.nom)===norm(nom))) { toast('Cet aliment existe déjà'); return; }
+  if(!sb){ toast('Non connecté'); return; }
+  const btn=$('#aSave'); btn.disabled=true;
+  const row = { nom, cat: $('#aCat').value, emoji: $('#aEmo').value.trim(), alg: $('#aAlg').value.trim(), par: myName() };
+  const { data, error } = await sb.from('aliments').insert(row).select().single();
+  if (error){ writeFail(error); btn.disabled=false; return; }
+  toast('Ajouté ✔'); await loadAliments(); openFood(data.id);
+}
+async function delFood(id){
+  let r = await sb.from('essais').delete().eq('aliment', id); if (r.error) return writeFail(r.error);
+  r = await sb.from('aliments').delete().eq('id', id); if (r.error) return writeFail(r.error);
+  closeSheet(); toast('Aliment supprimé'); await Promise.all([loadAliments(), loadEssais()]);
+}
+
+/* ---------- Événements ---------- */
+document.addEventListener('click', ev=>{
+  const t = ev.target;
+  const tab = t.closest('nav.tabs button');
+  if (tab){ view = tab.dataset.view; document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('on',b===tab));
+    $('#vAliments').hidden = view!=='aliments'; $('#vJournal').hidden = view!=='journal'; $('#fab').style.display = view==='aliments'?'':'none'; window.scrollTo({top:0}); return; }
+  const chip = t.closest('.chip'); if (chip){ catFilter = chip.dataset.cat; render(); return; }
+  const sg = t.closest('#seg button'); if (sg){ stateFilter = sg.dataset.f; document.querySelectorAll('#seg button').forEach(b=>b.classList.toggle('on',b===sg)); render(); return; }
+  const info = t.closest('[data-info]'); if (info){ $('#cs-'+info.dataset.info).classList.toggle('show'); return; }
+  const food = t.closest('[data-food]'); if (food){ openFood(food.dataset.food); return; }
+  if (t.closest('#fab')){ openAdd(); return; }
+  if (t.closest('[data-close]') || t===$('#veil')){ closeSheet(); return; }
+  const r = t.closest('#rx button'); if (r){ pickR = pickR===r.dataset.r ? null : r.dataset.r; document.querySelectorAll('#rx button').forEach(b=>b.classList.toggle('on', b.dataset.r===pickR)); return; }
+  if (t.closest('#fSave')){ saveEssai(); return; }
+  if (t.closest('#aSave')){ addFood(); return; }
+  const d = t.closest('[data-del]');
+  if (d){ if (d.classList.contains('arm')) delEssai(d.dataset.del); else { d.classList.add('arm'); d.textContent='Confirmer ?'; setTimeout(()=>{ if(d.isConnected){ d.classList.remove('arm'); d.textContent='Suppr.'; } },3000);} return; }
+  const df = t.closest('#fDelFood');
+  if (df){ if (df.classList.contains('arm')) delFood(sheetFood); else { df.classList.add('arm'); df.textContent='Toucher encore pour confirmer (efface aussi son historique)'; } return; }
+});
+$('#q').addEventListener('input', e=>{ query = e.target.value; render(); });
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeSheet(); if(e.key==='Enter' && e.target.id==='aNom') addFood(); });
+
+function banner(msg){ const b=$('#banner'); b.textContent = msg||''; b.classList.toggle('show', !!msg); }
+
+/* ---------- Qui note ? ---------- */
+function myName(){ try { return localStorage.getItem('dimieat-nom') || ''; } catch(e){ return ''; } }
+function askName(){
+  $('#sheet').innerHTML = `<div class="grab"></div>
+    <div class="sh-head"><span class="e">👋</span><div><h2>Qui utilise ce téléphone ?</h2><p>Pour savoir qui a noté chaque dégustation</p></div></div>
+    <span class="lbl">Prénom</span><input type="text" id="nName" maxlength="20" value="${esc(myName())}" placeholder="ex. Alexis">
+    <button class="primary" id="nSave">C'est moi</button>`;
+  showSheet(); setTimeout(()=>$('#nName')?.focus(),250);
+}
+document.addEventListener('click', ev=>{
+  if (ev.target.closest('#nSave')){ const v=$('#nName').value.trim(); if(!v) return; try{ localStorage.setItem('dimieat-nom', v); }catch(e){} closeSheet(); toast('Bonjour '+v+' !'); }
+  if (ev.target.closest('#who')){ askName(); }
+  if (ev.target.closest('#logout')){ sb.auth.signOut().then(()=>location.reload()); }
+});
+
+/* ---------- Connexion ---------- */
+const sb = (window.supabase && window.DIMIEAT_CONFIG && !/VOTRE/.test(window.DIMIEAT_CONFIG.url))
+  ? window.supabase.createClient(window.DIMIEAT_CONFIG.url, window.DIMIEAT_CONFIG.anonKey, { auth:{ persistSession:true, autoRefreshToken:true } })
+  : null;
+
+function showLogin(err){
+  $('#login').hidden = false; $('#app').hidden = true; $('#fab').style.display='none';
+  $('#lErr').textContent = err || '';
+}
+$('#lForm').addEventListener('submit', async ev=>{
+  ev.preventDefault();
+  const btn = $('#lBtn'); btn.disabled = true; $('#lErr').textContent='';
+  const { error } = await sb.auth.signInWithPassword({ email: $('#lMail').value.trim(), password: $('#lPass').value });
+  btn.disabled = false;
+  if (error) { $('#lErr').textContent = 'E-mail ou mot de passe incorrect.'; return; }
+  start();
+});
+
+/* ---------- Données ---------- */
+async function loadAliments(){
+  const { data, error } = await sb.from('aliments').select('*').order('created_at');
+  if (error) { banner('Impossible de charger les aliments ajoutés.'); return; }
+  custom = data.map(x=>({ id:String(x.id), nom:String(x.nom||'?').slice(0,40), cat: CAT[x.cat]?x.cat:'autres', emoji:String(x.emoji||'').slice(0,8), alg:String(x.alg||'').slice(0,20), builtin:false }));
+  render(); if (sheetFood && !foodById(sheetFood)) closeSheet();
+}
+async function loadEssais(){
+  const { data, error } = await sb.from('essais').select('*').order('created_at');
+  if (error) { banner('Impossible de charger le journal.'); return; }
+  essais = data.map(x=>({ _id:String(x.id), aliment:String(x.aliment||''), date:String(x.date||'').slice(0,10), reaction: RX[x.reaction]?x.reaction:'', note:String(x.note||'').slice(0,300), alerte:!!x.alerte, par: x.par?String(x.par):'', ts: Date.parse(x.created_at)||0 }));
+  render();
+  if (!document.activeElement?.closest?.('#sheet')) refreshSheet();
+}
+let started = false;
+async function start(){
+  $('#login').hidden = true; $('#app').hidden = false; $('#fab').style.display='';
+  const t = setTimeout(()=>banner('Connexion lente : les données ne sont pas encore à jour…'), 10000);
+  await Promise.all([loadAliments(), loadEssais()]);
+  clearTimeout(t); banner('');
+  if (started) return; started = true;
+  sb.channel('dimieat')
+    .on('postgres_changes', { event:'*', schema:'public', table:'aliments' }, ()=>loadAliments())
+    .on('postgres_changes', { event:'*', schema:'public', table:'essais' }, ()=>loadEssais())
+    .subscribe();
+  // Le téléphone coupe souvent la connexion en veille : on recharge au réveil.
+  document.addEventListener('visibilitychange', ()=>{ if (document.visibilityState==='visible') { loadAliments(); loadEssais(); } });
+  window.addEventListener('online', ()=>{ loadAliments(); loadEssais(); });
+  if (!myName()) askName();
+}
+
+render();
+(async function init(){
+  if (!sb){ banner('Configuration manquante : renseignez config.js (URL et clé Supabase).'); return; }
+  const { data } = await sb.auth.getSession();
+  if (data && data.session) start(); else showLogin();
+})();
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>
