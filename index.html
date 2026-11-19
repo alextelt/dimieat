@@ -421,12 +421,12 @@ async function saveEssai(){
   const btn = $('#fSave'); btn.disabled = true;
   const id = sheetFood;
   const row = { aliment: id, date: $('#fDate').value || today(), reaction: pickR || '', note: $('#fNote').value.trim(), alerte: $('#fAlert').checked, par: myName() };
-  const { error } = await sb.from('essais').insert(row);
+  const { error } = await sb.from('dimi_essais').insert(row);
   if (error){ writeFail(error); btn.disabled=false; return; }
   toast('Enregistré ✔'); await loadEssais(); openFood(id);
 }
 async function delEssai(id){
-  const { error } = await sb.from('essais').delete().eq('id', id);
+  const { error } = await sb.from('dimi_essais').delete().eq('id', id);
   if (error) return writeFail(error);
   await loadEssais(); if(sheetFood) openFood(sheetFood);
 }
@@ -436,13 +436,13 @@ async function addFood(){
   if(!sb){ toast('Non connecté'); return; }
   const btn=$('#aSave'); btn.disabled=true;
   const row = { nom, cat: $('#aCat').value, emoji: $('#aEmo').value.trim(), alg: $('#aAlg').value.trim(), par: myName() };
-  const { data, error } = await sb.from('aliments').insert(row).select().single();
+  const { data, error } = await sb.from('dimi_aliments').insert(row).select().single();
   if (error){ writeFail(error); btn.disabled=false; return; }
   toast('Ajouté ✔'); await loadAliments(); openFood(data.id);
 }
 async function delFood(id){
-  let r = await sb.from('essais').delete().eq('aliment', id); if (r.error) return writeFail(r.error);
-  r = await sb.from('aliments').delete().eq('id', id); if (r.error) return writeFail(r.error);
+  let r = await sb.from('dimi_essais').delete().eq('aliment', id); if (r.error) return writeFail(r.error);
+  r = await sb.from('dimi_aliments').delete().eq('id', id); if (r.error) return writeFail(r.error);
   closeSheet(); toast('Aliment supprimé'); await Promise.all([loadAliments(), loadEssais()]);
 }
 
@@ -506,13 +506,13 @@ $('#lForm').addEventListener('submit', async ev=>{
 
 /* ---------- Données ---------- */
 async function loadAliments(){
-  const { data, error } = await sb.from('aliments').select('*').order('created_at');
+  const { data, error } = await sb.from('dimi_aliments').select('*').order('created_at');
   if (error) { banner('Impossible de charger les aliments ajoutés.'); return; }
   custom = data.map(x=>({ id:String(x.id), nom:String(x.nom||'?').slice(0,40), cat: CAT[x.cat]?x.cat:'autres', emoji:String(x.emoji||'').slice(0,8), alg:String(x.alg||'').slice(0,20), builtin:false }));
   render(); if (sheetFood && !foodById(sheetFood)) closeSheet();
 }
 async function loadEssais(){
-  const { data, error } = await sb.from('essais').select('*').order('created_at');
+  const { data, error } = await sb.from('dimi_essais').select('*').order('created_at');
   if (error) { banner('Impossible de charger le journal.'); return; }
   essais = data.map(x=>({ _id:String(x.id), aliment:String(x.aliment||''), date:String(x.date||'').slice(0,10), reaction: RX[x.reaction]?x.reaction:'', note:String(x.note||'').slice(0,300), alerte:!!x.alerte, par: x.par?String(x.par):'', ts: Date.parse(x.created_at)||0 }));
   render();
@@ -526,8 +526,8 @@ async function start(){
   clearTimeout(t); banner('');
   if (started) return; started = true;
   sb.channel('dimieat')
-    .on('postgres_changes', { event:'*', schema:'public', table:'aliments' }, ()=>loadAliments())
-    .on('postgres_changes', { event:'*', schema:'public', table:'essais' }, ()=>loadEssais())
+    .on('postgres_changes', { event:'*', schema:'public', table:'dimi_aliments' }, ()=>loadAliments())
+    .on('postgres_changes', { event:'*', schema:'public', table:'dimi_essais' }, ()=>loadEssais())
     .subscribe();
   // Le téléphone coupe souvent la connexion en veille : on recharge au réveil.
   document.addEventListener('visibilitychange', ()=>{ if (document.visibilityState==='visible') { loadAliments(); loadEssais(); } });
