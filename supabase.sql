@@ -15,6 +15,7 @@ create table if not exists public.essais (
   aliment text not null,               -- id d'un aliment intégré (b-...) ou uuid d'un aliment ajouté
   date date not null default current_date,
   reaction text default '' check (reaction in ('', 'adore', 'aime', 'bof', 'pas', 'vomi')),
+  texture text default '',
   note text default '' check (char_length(note) <= 300),
   alerte boolean not null default false,
   par text default '',
@@ -37,3 +38,6 @@ grant select, insert, update, delete on public.essais   to authenticated;
 
 -- Synchro en temps réel entre les téléphones
 alter publication supabase_realtime add table public.aliments, public.essais;
+
+-- Migration (si la table essais existait déjà sans la texture)
+alter table public.essais add column if not exists texture text default '';

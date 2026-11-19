@@ -93,6 +93,19 @@
   .jrow .t b{display:block;font-size:15px}
   .jrow .t small{color:var(--muted);font-size:13px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .jrow .r{font-size:24px}
+  nav.tabs button{font-size:14px;white-space:nowrap;padding-left:2px;padding-right:2px}
+  .tcount{display:inline-block;min-width:18px;padding:0 5px;border-radius:9px;background:var(--warn);color:#fff;font-size:12px;line-height:18px;margin-left:2px}
+  .tcount:empty{display:none}
+  .hint{color:var(--muted);font-size:14px;line-height:1.45;font-weight:600;margin:14px 0 4px}
+  .rrow{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:10px 12px;margin-top:8px;width:100%;text-align:left}
+  .rrow .e{font-size:30px}
+  .rrow .t{flex:1;min-width:0}
+  .rrow .t b{display:block;font-size:16px}
+  .rrow .t small{display:block;color:var(--muted);font-size:13px;font-weight:700}
+  .rrow .rhist{display:flex;gap:2px;font-size:16px;flex-wrap:wrap;justify-content:flex-end;max-width:120px}
+  .rgroup{margin-top:18px;font-size:14px;font-weight:900;color:var(--muted)}
+  .rx.tx5 button .em{font-size:22px}
+  .pill-tx{display:inline-block;background:#f1ebdf;border-radius:8px;padding:0 6px;font-size:12px;font-weight:800;margin-left:4px;color:var(--ink)}
   .alertbox{margin-top:14px;background:#fdebe1;border:1px solid #f1c3a8;border-radius:var(--radius);padding:12px 14px}
   .alertbox h3{margin:0 0 6px;font-size:15px;color:var(--warn)}
 
@@ -148,7 +161,7 @@
 </div>
 <div class="wrap" id="app">
   <header class="top">
-    <div style="display:flex;align-items:center;gap:8px"><h1 class="title" style="flex:1"><span class="spoon">🥄</span> Ce qu'il a goûté</h1>
+    <div style="display:flex;align-items:center;gap:8px"><h1 class="title" style="flex:1"><span class="spoon">🥄</span> <span>Ce qu'a goûté <span id="bName"></span><small id="bAge" style="display:block;font-size:14px;color:var(--muted);font-weight:800;letter-spacing:0"></small></span></h1>
       <button id="who" class="x" title="Changer de prénom" style="margin:0">👤</button><button id="logout" class="x" title="Se déconnecter" style="margin:0">🚪</button></div>
     <div class="global">
       <div class="big" id="gNum">0 <small>/ 0 aliments découverts</small></div>
@@ -158,6 +171,7 @@
     <div class="banner" id="banner"></div>
     <nav class="tabs">
       <button class="on" data-view="aliments">🍽️ Aliments</button>
+      <button data-view="repro">🔁 Reproposer <b id="rCount" class="tcount"></b></button>
       <button data-view="journal">📖 Journal</button>
     </nav>
   </header>
@@ -175,6 +189,10 @@
     <div id="cats"></div>
   </div>
 
+  <div id="vRepro" hidden>
+    <p class="hint">Les aliments dont la dernière dégustation était 😐, 😖 ou 🤮. Un bébé a souvent besoin de goûter plusieurs fois un aliment avant de l'accepter : on reproposera sans forcer, sous une autre forme ou mélangé à un aliment qu'il aime.</p>
+    <div id="repro"></div>
+  </div>
   <div id="vJournal" hidden>
     <div id="journal"></div>
   </div>
@@ -198,6 +216,26 @@ const REACTIONS = [
   {id:'vomi',  em:'🤮', tx:'Recraché'},
 ];
 const RX = Object.fromEntries(REACTIONS.map(r=>[r.id,r]));
+const TEXTURES = [
+  {id:'lisse',    em:'🥣', tx:'Lisse'},
+  {id:'mouline',  em:'🌀', tx:'Moulinée'},
+  {id:'ecrase',   em:'🍴', tx:'Écrasée'},
+  {id:'morceaux', em:'🧩', tx:'Morceaux'},
+  {id:'doigts',   em:'✋', tx:'À la main'},
+];
+const TX = Object.fromEntries(TEXTURES.map(t=>[t.id,t]));
+const BEBE = (window.DIMIEAT_CONFIG && window.DIMIEAT_CONFIG.bebe) || { prenom:'Dimitri', naissance:'2026-07-11' };
+const REPROPOSER = ['pas','vomi','bof'];
+// Âge à une date donnée, ex. "4 mois ½"
+function ageAt(dateStr){
+  if (!BEBE.naissance) return '';
+  const b = new Date(BEBE.naissance+'T12:00:00'), d = new Date((dateStr||today())+'T12:00:00');
+  let m = (d.getFullYear()-b.getFullYear())*12 + d.getMonth()-b.getMonth();
+  let rest = d.getDate()-b.getDate(); if (rest<0){ m--; const prev = new Date(d.getFullYear(), d.getMonth(), 0).getDate(); rest += prev; }
+  if (m<0) return '';
+  if (m===0) return Math.max(rest,0)+' j';
+  return m+' mois'+(rest>=15?' ½':'');
+}
 
 const CATS = [
  {id:'legumes', nom:'Légumes', emoji:'🥕', c:'#e07a2f', conseil:[
@@ -318,6 +356,9 @@ function render(){
   $('#cats').innerHTML = html || '<div class="empty">Aucun aliment ne correspond.</div>';
 
   renderJournal(map, validIds);
+  renderRepro(map);
+  $('#bName').textContent = BEBE.prenom || 'bébé';
+  const a = ageAt(today()); $('#bAge').textContent = a ? a : '';
 }
 function tile(f, list){
   const last = list && list[0];
@@ -331,6 +372,28 @@ function tile(f, list){
     ${f.alg && !({poissons:'poisson',oeufs:'œuf',laitiers:'lait'}[f.cat]===f.alg)?`<span class="alg">${esc(f.alg)}</span>`:''}
     ${alert?`<span class="warn" title="Réaction à surveiller">⚠️</span>`:''}
   </button>`;
+}
+function renderRepro(map){
+  const items = [];
+  for (const f of allFoods()){
+    const l = map[f.id]; if (!l) continue;
+    if (!REPROPOSER.includes(l[0].reaction)) continue;
+    const days = Math.round((Date.parse(today()+'T12:00:00') - Date.parse(l[0].date+'T12:00:00'))/86400000);
+    items.push({f, l, days});
+  }
+  $('#rCount').textContent = items.length || '';
+  if (!items.length){ $('#repro').innerHTML = '<div class="empty">Rien à reproposer pour l\u2019instant 🎉</div>'; return; }
+  items.sort((a,b)=> b.days - a.days);
+  const group = (title, arr) => arr.length ? `<div class="rgroup">${title}</div>` + arr.map(({f,l,days})=>{
+      const last = l[0]; const t = TX[last.texture];
+      const when = days<=0 ? 'aujourd\u2019hui' : days===1 ? 'hier' : `il y a ${days} j`;
+      return `<button class="rrow" data-food="${esc(f.id)}"><span class="e">${esc(emojiOf(f))}</span>
+        <span class="t"><b>${esc(f.nom)}</b><small>Proposé ${l.length} fois · dernier essai ${when}${t?` · ${t.em} ${esc(t.tx)}`:''}</small></span>
+        <span class="rhist">${l.slice(0,8).reverse().map(e=>RX[e.reaction]?.em||'🍽️').join('')}</span></button>`;
+    }).join('') : '';
+  $('#repro').innerHTML =
+    group('😖 🤮 Pas apprécié', items.filter(x=>x.l[0].reaction!=='bof')) +
+    group('😐 Mitigé', items.filter(x=>x.l[0].reaction==='bof'));
 }
 function renderJournal(map, validIds){
   const list = essais.filter(e=>validIds.has(e.aliment)).sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.ts||0)-(a.ts||0));
@@ -349,24 +412,24 @@ function renderJournal(map, validIds){
   $('#journal').innerHTML = html;
   function row(e){
     const f = foodById(e.aliment); const r = RX[e.reaction];
-    const sub = [CAT[f.cat]?.nom, e.note].filter(Boolean).join(' · ');
+    const sub = [CAT[f.cat]?.nom, TX[e.texture]?.tx, e.note].filter(Boolean).join(' · ');
     return `<button class="jrow" data-food="${esc(f.id)}"><span class="e">${esc(emojiOf(f))}</span>
       <span class="t"><b>${esc(f.nom)}${e.alerte?' ⚠️':''}</b><small>${esc(sub)}</small></span><span class="r">${r?r.em:''}</span></button>`;
   }
 }
 
 /* ---------- Fiche aliment ---------- */
-let sheetFood = null, pickR = null;
+let sheetFood = null, pickR = null, pickT = null;
 function openFood(id){
   const f = foodById(id); if(!f) return;
-  sheetFood = id; pickR = null;
+  sheetFood = id; pickR = null; pickT = null;
   const c = CAT[f.cat] || CAT.autres;
   const list = essaisOf(id);
   const hist = list.map(e=>{
     const r = RX[e.reaction];
     const who = e.par || '';
     return `<div class="hitem"><span class="r">${r?r.em:'🍽️'}</span>
-      <div class="t"><b>${esc(fmtShort(e.date))}</b>${r?` — ${esc(r.tx)}`:''}${e.alerte?' <span style="color:var(--warn);font-weight:800">⚠️ à surveiller</span>':''}
+      <div class="t"><b>${esc(fmtShort(e.date))}</b>${ageAt(e.date)?` <span class="who">(${esc(ageAt(e.date))})</span>`:''}${r?` — ${esc(r.tx)}`:''}${TX[e.texture]?`<span class="pill-tx">${TX[e.texture].em} ${esc(TX[e.texture].tx)}</span>`:''}${e.alerte?' <span style="color:var(--warn);font-weight:800">⚠️ à surveiller</span>':''}
       ${e.note?`<div>${esc(e.note)}</div>`:''}${who?`<div class="who">noté par ${esc(who)}</div>`:''}</div>
       <button class="del needwrite" data-del="${esc(e._id)}">Suppr.</button></div>`;
   }).join('');
@@ -377,10 +440,12 @@ function openFood(id){
     <div class="needwrite">
       <span class="lbl">Nouvelle dégustation</span>
       <div class="rx" id="rx">${REACTIONS.map(r=>`<button data-r="${r.id}"><span class="em">${r.em}</span><span class="tx">${r.tx}</span></button>`).join('')}</div>
+      <span class="lbl">Texture</span>
+      <div class="rx tx5" id="txr">${TEXTURES.map(t=>`<button data-t="${t.id}"><span class="em">${t.em}</span><span class="tx">${t.tx}</span></button>`).join('')}</div>
       <span class="lbl">Date</span>
       <input type="date" id="fDate" value="${today()}" max="${today()}">
       <span class="lbl">Note (facultatif)</span>
-      <textarea id="fNote" placeholder="Texture, quantité, avec quoi…" maxlength="300"></textarea>
+      <textarea id="fNote" placeholder="Quantité, avec quoi, comment…" maxlength="300"></textarea>
       <label class="check"><input type="checkbox" id="fAlert"> Réaction à surveiller (rougeur, boutons…)</label>
       <button class="primary" id="fSave">Enregistrer</button>
     </div>
@@ -403,10 +468,14 @@ function openAdd(){
 }
 function refreshSheet(){
   if (!sheetFood || !$('#sheet').classList.contains('show')) return;
-  const keepN = $('#fNote')?.value, keepA = $('#fAlert')?.checked, keepD = $('#fDate')?.value, keepR = pickR;
+  const keepN = $('#fNote')?.value, keepA = $('#fAlert')?.checked, keepD = $('#fDate')?.value, keepR = pickR, keepT = pickT;
   openFood(sheetFood);
   if ($('#fNote')) { $('#fNote').value = keepN||''; $('#fAlert').checked = !!keepA; if (keepD) $('#fDate').value = keepD; }
-  pickR = keepR; document.querySelectorAll('#rx button').forEach(b=>b.classList.toggle('on', b.dataset.r===pickR));
+  pickR = keepR; pickT = keepT; markPicks();
+}
+function markPicks(){
+  document.querySelectorAll('#rx button').forEach(b=>b.classList.toggle('on', b.dataset.r===pickR));
+  document.querySelectorAll('#txr button').forEach(b=>b.classList.toggle('on', b.dataset.t===pickT));
 }
 function showSheet(){ $('#veil').classList.add('show'); $('#sheet').classList.add('show'); }
 function closeSheet(){ $('#veil').classList.remove('show'); $('#sheet').classList.remove('show'); sheetFood=null; }
@@ -418,8 +487,12 @@ async function saveEssai(){
   if(!sb){ toast('Non connecté'); return; }
   const btn = $('#fSave'); btn.disabled = true;
   const id = sheetFood;
-  const row = { aliment: id, date: $('#fDate').value || today(), reaction: pickR || '', note: $('#fNote').value.trim(), alerte: $('#fAlert').checked, par: myName() };
-  const { error } = await sb.from('essais').insert(row);
+  const row = { aliment: id, date: $('#fDate').value || today(), reaction: pickR || '', texture: pickT || '', note: $('#fNote').value.trim(), alerte: $('#fAlert').checked, par: myName() };
+  let { error } = await sb.from('essais').insert(row);
+  if (error && /texture/.test(error.message||'')) {   // colonne pas encore créée dans Supabase
+    delete row.texture; ({ error } = await sb.from('essais').insert(row));
+    if (!error) console.warn('Colonne texture absente : exécuter la migration SQL');
+  }
   if (error){ writeFail(error); btn.disabled=false; return; }
   toast('Enregistré ✔'); await loadEssais(); openFood(id);
 }
@@ -449,14 +522,15 @@ document.addEventListener('click', ev=>{
   const t = ev.target;
   const tab = t.closest('nav.tabs button');
   if (tab){ view = tab.dataset.view; document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('on',b===tab));
-    $('#vAliments').hidden = view!=='aliments'; $('#vJournal').hidden = view!=='journal'; $('#fab').style.display = view==='aliments'?'':'none'; window.scrollTo({top:0}); return; }
+    $('#vAliments').hidden = view!=='aliments'; $('#vJournal').hidden = view!=='journal'; $('#vRepro').hidden = view!=='repro'; $('#fab').style.display = view==='aliments'?'':'none'; window.scrollTo({top:0}); return; }
   const chip = t.closest('.chip'); if (chip){ const sec = document.getElementById('sec-'+chip.dataset.cat); if (sec){ jumping = Date.now(); setActive(chip.dataset.cat); sec.scrollIntoView({behavior:'smooth', block:'start'}); } return; }
   const sg = t.closest('#seg button'); if (sg){ stateFilter = sg.dataset.f; document.querySelectorAll('#seg button').forEach(b=>b.classList.toggle('on',b===sg)); render(); return; }
   const info = t.closest('[data-info]'); if (info){ $('#cs-'+info.dataset.info).classList.toggle('show'); return; }
   const food = t.closest('[data-food]'); if (food){ openFood(food.dataset.food); return; }
   if (t.closest('#fab')){ openAdd(); return; }
   if (t.closest('[data-close]') || t===$('#veil')){ closeSheet(); return; }
-  const r = t.closest('#rx button'); if (r){ pickR = pickR===r.dataset.r ? null : r.dataset.r; document.querySelectorAll('#rx button').forEach(b=>b.classList.toggle('on', b.dataset.r===pickR)); return; }
+  const r = t.closest('#rx button'); if (r){ pickR = pickR===r.dataset.r ? null : r.dataset.r; markPicks(); return; }
+  const tb = t.closest('#txr button'); if (tb){ pickT = pickT===tb.dataset.t ? null : tb.dataset.t; markPicks(); return; }
   if (t.closest('#fSave')){ saveEssai(); return; }
   if (t.closest('#aSave')){ addFood(); return; }
   const d = t.closest('[data-del]');
@@ -533,7 +607,7 @@ async function loadAliments(){
 async function loadEssais(){
   const { data, error } = await sb.from('essais').select('*').order('created_at');
   if (error) { banner('Impossible de charger le journal.'); return; }
-  essais = data.map(x=>({ _id:String(x.id), aliment:String(x.aliment||''), date:String(x.date||'').slice(0,10), reaction: RX[x.reaction]?x.reaction:'', note:String(x.note||'').slice(0,300), alerte:!!x.alerte, par: x.par?String(x.par):'', ts: Date.parse(x.created_at)||0 }));
+  essais = data.map(x=>({ _id:String(x.id), aliment:String(x.aliment||''), date:String(x.date||'').slice(0,10), reaction: RX[x.reaction]?x.reaction:'', texture: TX[x.texture]?x.texture:'', note:String(x.note||'').slice(0,300), alerte:!!x.alerte, par: x.par?String(x.par):'', ts: Date.parse(x.created_at)||0 }));
   render();
   if (!document.activeElement?.closest?.('#sheet')) refreshSheet();
 }
