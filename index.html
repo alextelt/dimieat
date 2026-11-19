@@ -41,22 +41,23 @@
   nav.tabs button{flex:1;border:0;background:transparent;padding:9px 0;border-radius:11px;font-weight:800;font-size:15px;color:var(--muted)}
   nav.tabs button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.08)}
 
-  .sticky{position:sticky;top:0;z-index:5;background:var(--bg);padding:10px 0 8px}
-  .chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+  .sticky{position:sticky;top:0;z-index:5;background:var(--bg);padding:8px 0 6px;margin:0 -14px;padding-left:14px;padding-right:14px;box-shadow:0 6px 8px -8px rgba(0,0,0,.15)}
+  .chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;scroll-behavior:smooth}
   .chips::-webkit-scrollbar{display:none}
-  .chip{flex:0 0 auto;border:1.5px solid var(--line);background:var(--card);border-radius:14px;padding:7px 11px 8px;text-align:left;min-width:92px}
-  .chip .n{font-weight:800;font-size:14px;white-space:nowrap}
-  .chip .p{font-size:12px;color:var(--muted);font-weight:700}
-  .chip .mini{height:4px;border-radius:9px;background:#ece5d6;margin-top:5px;overflow:hidden}
-  .chip .mini i{display:block;height:100%;background:var(--c)}
-  .chip.on{border-color:var(--c);background:color-mix(in srgb,var(--c) 12%,var(--card))}
-  .tools{display:flex;gap:8px;margin-top:8px}
+  .chip{flex:0 0 auto;display:flex;align-items:center;gap:6px;border:0;border-radius:99px;padding:3px;background:transparent}
+  .chip .ring{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--c) var(--p),#e3dccd 0)}
+  .chip .ring span{width:33px;height:33px;border-radius:50%;background:var(--card);display:grid;place-items:center;font-size:19px}
+  .chip .lab{display:none;font-weight:800;font-size:14px;white-space:nowrap;padding-right:10px}
+  .chip .lab small{color:var(--muted);font-weight:700;margin-left:4px}
+  .chip.on{background:color-mix(in srgb,var(--c) 16%,var(--card))}
+  .chip.on .lab{display:inline}
+  .tools{display:flex;gap:8px;margin-top:10px}
   .tools input{flex:1;min-width:0;border:1.5px solid var(--line);background:var(--card);border-radius:12px;padding:9px 12px;font:inherit;font-size:15px}
   .seg{display:flex;background:#ebe4d5;border-radius:12px;padding:3px}
   .seg button{border:0;background:transparent;border-radius:9px;padding:6px 9px;font-weight:800;font-size:13px;color:var(--muted)}
   .seg button.on{background:var(--card);color:var(--ink)}
 
-  section.cat{margin-top:18px}
+  section.cat{margin-top:18px;scroll-margin-top:66px}
   .cathead{display:flex;align-items:center;gap:10px}
   .cathead .ce{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;font-size:22px;background:color-mix(in srgb,var(--c) 18%,#fff)}
   .cathead h2{margin:0;font-size:18px;font-weight:900;flex:1}
@@ -162,17 +163,15 @@
   </header>
 
   <div id="vAliments">
-    <div class="sticky">
-      <div class="chips" id="chips"></div>
-      <div class="tools">
+    <div class="tools">
         <input id="q" type="search" placeholder="Chercher un aliment…" autocomplete="off">
         <div class="seg" id="seg">
           <button class="on" data-f="all">Tous</button>
           <button data-f="done">Goûtés</button>
           <button data-f="todo">À faire</button>
         </div>
-      </div>
     </div>
+    <div class="sticky"><div class="chips" id="chips"></div></div>
     <div id="cats"></div>
   </div>
 
@@ -264,7 +263,7 @@ for (const [cat, list] of Object.entries(BASE)) {
 /* ---------- État ---------- */
 let custom = [];             // aliments ajoutés (db)
 let essais = [];             // dégustations (db)
-let view = 'aliments', catFilter = 'all', stateFilter = 'all', query = '';
+let view = 'aliments', activeCat = 'legumes', stateFilter = 'all', query = '';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -290,18 +289,17 @@ function render(){
   const rc = {}; for (const f of foods){ const l = map[f.id]; if(l && l[0].reaction) rc[l[0].reaction]=(rc[l[0].reaction]||0)+1; }
   $('#gReacts').innerHTML = REACTIONS.filter(r=>rc[r.id]).map(r=>`<span title="${r.tx}">${r.em} ${rc[r.id]}</span>`).join('') ;
 
-  // chips
-  const chip = (id, nom, emo, c, d, t) => `<button class="chip ${catFilter===id?'on':''}" data-cat="${id}" style="--c:${c}">
-     <div class="n">${emo} ${esc(nom)}</div><div class="p">${d}/${t}</div><div class="mini"><i style="width:${t?d/t*100:0}%"></i></div></button>`;
-  let ch = chip('all','Tout','🍽️','#2f8a5a',doneCount,foods.length);
-  for (const c of CATS){ const fs = foods.filter(f=>f.cat===c.id); if(!fs.length) continue; ch += chip(c.id,c.nom,c.emoji,c.c,fs.filter(f=>map[f.id]).length,fs.length); }
-  $('#chips').innerHTML = ch;
+  // pastilles de catégories (navigation)
+  let ch = '';
+  for (const c of CATS){ const fs = foods.filter(f=>f.cat===c.id); if(!fs.length) continue; const d = fs.filter(f=>map[f.id]).length;
+    ch += `<button class="chip ${activeCat===c.id?'on':''}" data-cat="${c.id}" style="--c:${c.c};--p:${d/fs.length*100}%" aria-label="${esc(c.nom)}">
+      <span class="ring"><span>${c.emoji}</span></span><span class="lab">${esc(c.nom)}<small>${d}/${fs.length}</small></span></button>`; }
+  { const row=$('#chips'), sl=row.scrollLeft; row.innerHTML = ch; row.style.scrollBehavior='auto'; row.scrollLeft=sl; row.style.scrollBehavior=''; }
 
   // sections
   const q = norm(query);
   let html = '';
   for (const c of CATS){
-    if (catFilter!=='all' && catFilter!==c.id) continue;
     const fsAll = foods.filter(f=>f.cat===c.id).sort((a,b)=>a.nom.localeCompare(b.nom,'fr'));
     if(!fsAll.length) continue;
     const d = fsAll.filter(f=>map[f.id]).length;
@@ -309,7 +307,7 @@ function render(){
     if (stateFilter==='done') fs = fs.filter(f=>map[f.id]);
     if (stateFilter==='todo') fs = fs.filter(f=>!map[f.id]);
     if ((q || stateFilter!=='all') && !fs.length) continue;
-    html += `<section class="cat" style="--c:${c.c}">
+    html += `<section class="cat" id="sec-${c.id}" data-sec="${c.id}" style="--c:${c.c}">
       <div class="cathead"><div class="ce">${c.emoji}</div><h2>${esc(c.nom)}</h2><span class="cnt">${d}/${fsAll.length}</span>
       <button class="info" data-info="${c.id}" aria-label="Conseils">i</button></div>
       <div class="catbar"><i style="width:${d/fsAll.length*100}%"></i></div>
@@ -330,7 +328,7 @@ function tile(f, list){
     ${r?`<span class="badge">${r.em}</span>`:''}
     <span class="e">${esc(emojiOf(f))}</span>
     <span class="nm">${esc(f.nom)}</span>
-    ${f.alg?`<span class="alg">${esc(f.alg)}</span>`:''}
+    ${f.alg && !({poissons:'poisson',oeufs:'œuf',laitiers:'lait'}[f.cat]===f.alg)?`<span class="alg">${esc(f.alg)}</span>`:''}
     ${alert?`<span class="warn" title="Réaction à surveiller">⚠️</span>`:''}
   </button>`;
 }
@@ -452,7 +450,7 @@ document.addEventListener('click', ev=>{
   const tab = t.closest('nav.tabs button');
   if (tab){ view = tab.dataset.view; document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('on',b===tab));
     $('#vAliments').hidden = view!=='aliments'; $('#vJournal').hidden = view!=='journal'; $('#fab').style.display = view==='aliments'?'':'none'; window.scrollTo({top:0}); return; }
-  const chip = t.closest('.chip'); if (chip){ catFilter = chip.dataset.cat; render(); return; }
+  const chip = t.closest('.chip'); if (chip){ const sec = document.getElementById('sec-'+chip.dataset.cat); if (sec){ jumping = Date.now(); setActive(chip.dataset.cat); sec.scrollIntoView({behavior:'smooth', block:'start'}); } return; }
   const sg = t.closest('#seg button'); if (sg){ stateFilter = sg.dataset.f; document.querySelectorAll('#seg button').forEach(b=>b.classList.toggle('on',b===sg)); render(); return; }
   const info = t.closest('[data-info]'); if (info){ $('#cs-'+info.dataset.info).classList.toggle('show'); return; }
   const food = t.closest('[data-food]'); if (food){ openFood(food.dataset.food); return; }
@@ -466,6 +464,21 @@ document.addEventListener('click', ev=>{
   const df = t.closest('#fDelFood');
   if (df){ if (df.classList.contains('arm')) delFood(sheetFood); else { df.classList.add('arm'); df.textContent='Toucher encore pour confirmer (efface aussi son historique)'; } return; }
 });
+/* Suivi du défilement : la pastille active suit la catégorie affichée */
+let jumping = 0;
+function setActive(id){
+  if (!id || id===activeCat && document.querySelector('.chip.on')) return;
+  activeCat = id;
+  document.querySelectorAll('.chip').forEach(b=>{ const on = b.dataset.cat===id; b.classList.toggle('on', on);
+    if (on){ const row=$('#chips'); const x = b.offsetLeft - row.clientWidth/2 + b.offsetWidth/2; row.scrollTo({left:x, behavior:'smooth'}); } });
+}
+function spy(){
+  if (view!=='aliments' || Date.now()-jumping < 900) return;
+  const secs = document.querySelectorAll('section.cat'); let cur = secs[0]?.dataset.sec;
+  for (const s of secs){ if (s.getBoundingClientRect().top <= 90) cur = s.dataset.sec; else break; }
+  setActive(cur);
+}
+let spyT; window.addEventListener('scroll', ()=>{ if (spyT) return; spyT = requestAnimationFrame(()=>{ spyT=null; spy(); }); }, {passive:true});
 $('#q').addEventListener('input', e=>{ query = e.target.value; render(); });
 document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeSheet(); if(e.key==='Enter' && e.target.id==='aNom') addFood(); });
 
