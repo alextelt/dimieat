@@ -1,7 +1,6 @@
 -- DimiEat : à exécuter une fois dans Supabase > SQL Editor
--- Tables préfixées dimi_ pour cohabiter avec d'autres projets (ex. ADbot) dans le même projet Supabase.
 
-create table if not exists public.dimi_aliments (
+create table if not exists public.aliments (
   id uuid primary key default gen_random_uuid(),
   nom text not null check (char_length(nom) between 1 and 40),
   cat text not null,
@@ -11,7 +10,7 @@ create table if not exists public.dimi_aliments (
   created_at timestamptz not null default now()
 );
 
-create table if not exists public.dimi_essais (
+create table if not exists public.essais (
   id uuid primary key default gen_random_uuid(),
   aliment text not null,               -- id d'un aliment intégré (b-...) ou uuid d'un aliment ajouté
   date date not null default current_date,
@@ -21,20 +20,20 @@ create table if not exists public.dimi_essais (
   par text default '',
   created_at timestamptz not null default now()
 );
-create index if not exists dimi_essais_aliment_idx on public.dimi_essais (aliment);
+create index if not exists essais_aliment_idx on public.essais (aliment);
 
 -- Seuls les comptes connectés (vous deux) peuvent lire et écrire
-alter table public.dimi_aliments enable row level security;
-alter table public.dimi_essais   enable row level security;
+alter table public.aliments enable row level security;
+alter table public.essais   enable row level security;
 
-drop policy if exists "dimieat_famille" on public.dimi_aliments;
-drop policy if exists "dimieat_famille" on public.dimi_essais;
-create policy "dimieat_famille" on public.dimi_aliments for all to authenticated using (true) with check (true);
-create policy "dimieat_famille" on public.dimi_essais   for all to authenticated using (true) with check (true);
+drop policy if exists "famille" on public.aliments;
+drop policy if exists "famille" on public.essais;
+create policy "famille" on public.aliments for all to authenticated using (true) with check (true);
+create policy "famille" on public.essais   for all to authenticated using (true) with check (true);
 
 -- Accès de l'API pour les comptes connectés (nécessaire si « Grant API access to new tables automatically » est décoché)
-grant select, insert, update, delete on public.dimi_aliments to authenticated;
-grant select, insert, update, delete on public.dimi_essais   to authenticated;
+grant select, insert, update, delete on public.aliments to authenticated;
+grant select, insert, update, delete on public.essais   to authenticated;
 
 -- Synchro en temps réel entre les téléphones
-alter publication supabase_realtime add table public.dimi_aliments, public.dimi_essais;
+alter publication supabase_realtime add table public.aliments, public.essais;
