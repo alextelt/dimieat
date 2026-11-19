@@ -106,6 +106,33 @@
   .rgroup{margin-top:18px;font-size:14px;font-weight:900;color:var(--muted)}
   .rx.tx5 button .em{font-size:22px}
   .pill-tx{display:inline-block;background:#f1ebdf;border-radius:8px;padding:0 6px;font-size:12px;font-weight:800;margin-left:4px;color:var(--ink)}
+  .jstats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
+  .jstats div{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:10px;text-align:center}
+  .jstats b{display:block;font-size:26px;font-weight:900;line-height:1.1}
+  .jstats span{font-size:12px;color:var(--muted);font-weight:700;line-height:1.2;display:block}
+  .jseg{margin-top:14px}
+  .jseg button{flex:1;padding:8px 0;font-size:14px}
+  .dcard{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:12px;margin-top:12px}
+  .dhead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:8px}
+  .dhead b{font-size:16px}
+  .dhead span{color:var(--muted);font-weight:800;font-size:13px;white-space:nowrap}
+  .bubbles{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px}
+  .bub{border:0;border-radius:14px;padding:8px 4px 8px;background:color-mix(in srgb,var(--c) 12%,#fff);display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0}
+  .bub .be{position:relative;font-size:30px;line-height:1.1}
+  .bub .br{position:absolute;right:-14px;bottom:-4px;font-size:17px;font-style:normal}
+  .bub .bn{font-size:13px;font-weight:800;line-height:1.15;text-align:center}
+  .bub .bs{font-size:11px;font-weight:800;color:var(--muted)}
+  .bub .bs em{font-style:normal;color:var(--accent)}
+  .bub .bnote{font-size:11px;color:var(--muted);font-weight:600;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .prow{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:10px 14px;margin-top:8px}
+  .prow .e{font-size:30px}
+  .prow .t{flex:1;min-width:0}
+  .prow .t b{display:block;font-size:15px}
+  .pbar{display:block;height:6px;border-radius:9px;background:#ece5d6;margin:5px 0 4px;overflow:hidden}
+  .pbar i{display:block;height:100%;background:var(--c)}
+  .rline{font-size:14px;letter-spacing:1px}
+  .pdate{display:block;color:var(--muted);font-size:12px;font-weight:700}
+  .prow .cnt{font-size:22px;font-weight:900}
   .alertbox{margin-top:14px;background:#fdebe1;border:1px solid #f1c3a8;border-radius:var(--radius);padding:12px 14px}
   .alertbox h3{margin:0 0 6px;font-size:15px;color:var(--warn)}
 
@@ -365,7 +392,7 @@ function tile(f, list){
   const r = last && RX[last.reaction];
   const alert = list && list.some(e=>e.alerte);
   return `<button class="tile ${list?'done':''}" data-food="${esc(f.id)}">
-    ${list && list.length>1?`<span class="times">×${list.length}</span>`:''}
+    ${list?`<span class="times">×${list.length}</span>`:''}
     ${r?`<span class="badge">${r.em}</span>`:''}
     <span class="e">${esc(emojiOf(f))}</span>
     <span class="nm">${esc(f.nom)}</span>
@@ -395,26 +422,63 @@ function renderRepro(map){
     group('😖 🤮 Pas apprécié', items.filter(x=>x.l[0].reaction!=='bof')) +
     group('😐 Mitigé', items.filter(x=>x.l[0].reaction==='bof'));
 }
+let jMode = 'aliments';
 function renderJournal(map, validIds){
   const list = essais.filter(e=>validIds.has(e.aliment)).sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.ts||0)-(a.ts||0));
   if(!list.length){ $('#journal').innerHTML = '<div class="empty" style="margin-top:16px">Aucune dégustation enregistrée. Touchez un aliment pour noter la première !</div>'; return; }
-  let html = '';
+  // rang de chaque dégustation pour son aliment (1 = première fois)
+  const rank = {};
+  for (const id in map){ const asc = map[id].slice().reverse(); asc.forEach((e,i)=>{ rank[e._id] = i+1; }); }
+  const weekAgo = new Date(Date.now()-6*86400000).toLocaleDateString('sv');
+  const newWeek = list.filter(e=>rank[e._id]===1 && e.date>=weekAgo).length;
+  const days = new Set(list.map(e=>e.date)).size;
+
+  let html = `<div class="jstats">
+     <div><b>${list.length}</b><span>dégustations</span></div>
+     <div><b>${newWeek}</b><span>nouveaux aliments<br>sur 7 jours</span></div>
+     <div><b>${days}</b><span>jours notés</span></div></div>`;
+
   const alerts = list.filter(e=>e.alerte);
-  if (alerts.length){
-    html += `<div class="alertbox"><h3>⚠️ À surveiller</h3>${alerts.map(row).join('')}</div>`;
+  if (alerts.length) html += `<div class="alertbox"><h3>⚠️ À surveiller</h3><div class="bubbles">${merge(alerts).map(g=>bubble(g.last,true)).join('')}</div></div>`;
+
+  html += `<div class="seg jseg"><button data-j="aliments" class="${jMode==='aliments'?'on':''}">🍽️ Par aliment</button><button data-j="jours" class="${jMode==='jours'?'on':''}">📅 Par jour</button></div>`;
+
+  if (jMode==='aliments'){
+    const rows = Object.entries(map).filter(([id])=>validIds.has(id)).map(([id,l])=>({f:foodById(id), l}))
+      .sort((a,b)=> b.l.length-a.l.length || a.f.nom.localeCompare(b.f.nom,'fr'));
+    const max = rows[0]?.l.length || 1;
+    html += rows.map(({f,l})=>{
+      const c = CAT[f.cat]||CAT.autres;
+      return `<button class="prow" data-food="${esc(f.id)}" style="--c:${c.c}">
+        <span class="e">${esc(emojiOf(f))}</span>
+        <span class="t"><b>${esc(f.nom)}</b>
+          <span class="pbar"><i style="width:${l.length/max*100}%"></i></span>
+          <span class="rline">${l.slice(0,10).reverse().map(e=>RX[e.reaction]?.em||'🍽️').join('')}</span>
+          <small class="pdate">depuis le ${esc(fmtShort(l[l.length-1].date))}</small></span>
+        <span class="cnt">×${l.length}</span></button>`;
+    }).join('');
+  } else {
+    let cur = null, buf = [];
+    const flush = () => { if (cur===null) return;
+      const nouveaux = buf.filter(e=>rank[e._id]===1).length;
+      html += `<div class="dcard"><div class="dhead"><b>${esc((s=>s.charAt(0).toUpperCase()+s.slice(1))(fmtDate(cur)))}</b>
+        <span>${ageAt(cur)?esc(ageAt(cur)):''}${nouveaux?` · ✨ ${nouveaux} nouveau${nouveaux>1?'x':''}`:''}</span></div>
+        <div class="bubbles">${merge(buf).map(g=>bubble(g.last, false, g.n)).join('')}</div></div>`; };
+    for (const e of list){ if (e.date!==cur){ flush(); cur=e.date; buf=[]; } buf.push(e); }
+    flush();
   }
-  let cur = null;
-  for (const e of list){
-    if (e.date!==cur){ if(cur!==null) html+='</div>'; cur=e.date; html+=`<div class="jday"><h3>${esc((s=>s.charAt(0).toUpperCase()+s.slice(1))(fmtDate(e.date)))}</h3>`; }
-    html += row(e);
-  }
-  html += '</div>';
   $('#journal').innerHTML = html;
-  function row(e){
-    const f = foodById(e.aliment); const r = RX[e.reaction];
-    const sub = [CAT[f.cat]?.nom, TX[e.texture]?.tx, e.note].filter(Boolean).join(' · ');
-    return `<button class="jrow" data-food="${esc(f.id)}"><span class="e">${esc(emojiOf(f))}</span>
-      <span class="t"><b>${esc(f.nom)}${e.alerte?' ⚠️':''}</b><small>${esc(sub)}</small></span><span class="r">${r?r.em:''}</span></button>`;
+
+  // un aliment = une bulle par jour (la plus récente), avec le nombre d'essais ce jour-là
+  function merge(arr){ const m = new Map(); for (const e of arr){ const g = m.get(e.aliment); if (g) g.n++; else m.set(e.aliment, {last:e, n:1}); } return [...m.values()]; }
+  function bubble(e, withDate, nDay){
+    const f = foodById(e.aliment); const r = RX[e.reaction]; const n = rank[e._id]; const c = CAT[f.cat]||CAT.autres;
+    const tip = [f.nom, r?.tx, TX[e.texture]?.tx, e.note].filter(Boolean).join(' · ');
+    return `<button class="bub" data-food="${esc(f.id)}" title="${esc(tip)}" style="--c:${c.c}">
+      <span class="be">${esc(emojiOf(f))}${r?`<i class="br">${r.em}</i>`:''}</span>
+      <span class="bn">${esc(f.nom)}</span>
+      <span class="bs">${nDay>1?`×${nDay} ce jour`:(n===1?'<em>✨ 1ʳᵉ fois</em>':`${n}ᵉ fois`)}${withDate?` · ${esc(fmtShort(e.date))}`:''}</span>
+      ${e.note?`<span class="bnote">${esc(e.note)}</span>`:''}</button>`;
   }
 }
 
@@ -530,6 +594,7 @@ document.addEventListener('click', ev=>{
   if (t.closest('#fab')){ openAdd(); return; }
   if (t.closest('[data-close]') || t===$('#veil')){ closeSheet(); return; }
   const r = t.closest('#rx button'); if (r){ pickR = pickR===r.dataset.r ? null : r.dataset.r; markPicks(); return; }
+  const jb = t.closest('.jseg button'); if (jb){ jMode = jb.dataset.j; render(); return; }
   const tb = t.closest('#txr button'); if (tb){ pickT = pickT===tb.dataset.t ? null : tb.dataset.t; markPicks(); return; }
   if (t.closest('#fSave')){ saveEssai(); return; }
   if (t.closest('#aSave')){ addFood(); return; }
