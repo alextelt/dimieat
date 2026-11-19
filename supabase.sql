@@ -32,5 +32,9 @@ drop policy if exists "dimieat_famille" on public.dimi_essais;
 create policy "dimieat_famille" on public.dimi_aliments for all to authenticated using (true) with check (true);
 create policy "dimieat_famille" on public.dimi_essais   for all to authenticated using (true) with check (true);
 
+-- Accès de l'API pour les comptes connectés (nécessaire si « Grant API access to new tables automatically » est décoché)
+grant select, insert, update, delete on public.dimi_aliments to authenticated;
+grant select, insert, update, delete on public.dimi_essais   to authenticated;
+
 -- Synchro en temps réel entre les téléphones
 alter publication supabase_realtime add table public.dimi_aliments, public.dimi_essais;
